@@ -123,6 +123,7 @@ func Downloader() {
 			case <-t.C:
 				fmt.Print("..")
 			case <-resp.Done:
+				fmt.Print("\n")
 				break Loop
 			}
 		}
