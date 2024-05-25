@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/essentialkaos/zip7"
 	"github.com/gorilla/pat"
 	"github.com/unrolled/render"
 )
@@ -113,6 +113,8 @@ func Downloader() {
 		close(response)
 	}()
 
+	spinner := []string{"|", "/", "-", "\\"}
+
 	for resp := range response {
 		t := time.NewTicker(500 * time.Millisecond)
 		defer t.Stop()
@@ -121,9 +123,11 @@ func Downloader() {
 		for {
 			select {
 			case <-t.C:
-				fmt.Print("..")
+				for _, s := range spinner {
+					fmt.Printf("\r%s", s)
+					time.Sleep(100 * time.Millisecond)
+				}
 			case <-resp.Done:
-				fmt.Print("\n")
 				break Loop
 			}
 		}
@@ -137,19 +141,51 @@ func Downloader() {
 }
 
 func ExtractArchive(archive string) {
-	fmt.Printf("%s 압축 해제 중\n", strings.Split(archive, ",")[0])
+	fmt.Printf("%s 압축 해제 중\n", archive)
 
-	out, err := zip7.Extract(zip7.Props{
-		File:      archive,
-		OutputDir: "./data",
-		Delete:    true,
-	})
+	cmd := exec.Command("7z", "x", archive, "-odata")
+
+	err := cmd.Run()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%s \n", out)
+	fmt.Printf("%s 압축 해제 완료\n", archive)
+}
+
+func RemoveCompress() {
+	dir := "data"
+
+	d, err := os.Open(dir)
+
+	if err != nil {
+		fmt.Println("data 디렉토리 오픈 실패: ", err)
+	}
+
+	defer d.Close()
+
+	files, err := d.ReadDir(-1)
+
+	if err != nil {
+		fmt.Println("data 폴더 내 파일 읽어오기 실패: ", err)
+	}
+
+	for _, file := range files {
+		if strings.Contains(file.Name(), "7z") {
+			filePath := filepath.Join(dir, file.Name())
+
+			err := os.Remove(filePath)
+
+			if err != nil {
+				fmt.Printf("%s 파일 삭제 실패 : %v\n", filePath, err)
+			} else {
+				fmt.Printf("%s 파일 삭제\n", filePath)
+			}
+		}
+	}
+
+	fmt.Printf("%d 개 파일 삭제 완료\n", len(files))
 }
 
 func main() {
@@ -171,7 +207,7 @@ func main() {
 	Downloader()
 
 	// Start Extract
-	ext := os.Args[1]
+	ext := "001"
 	dir := "./data/"
 
 	files, err := ioutil.ReadDir(dir)
@@ -185,4 +221,7 @@ func main() {
 			ExtractArchive(dir + f.Name())
 		}
 	}
+
+	// RemoveCompress()
+	RemoveCompress()
 }
